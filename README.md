@@ -4,6 +4,8 @@ Plano 3D interactivo con la propuesta de red Wi-Fi y videovigilancia del Institu
 (19.54616° N, 97.26972° O). Cada access point, cámara y gabinete de red tiene su justificación: al hacer clic,
 la vista vuela hasta el punto y un panel explica por qué va ahí, qué cubre, el modelo sugerido y a qué switch se conecta.
 
+**Ver en línea:** https://red-itspe-3d.vercel.app
+
 ## Qué incluye
 
 - 40 access points, 24 cámaras y 8 nodos de red (site principal, gabinetes y enlace inalámbrico a invernaderos).
@@ -56,8 +58,9 @@ Si cambias la imagen de `assets/`, vuelve a generar `js/satelite.js` con su cont
 
 ## Publicación
 
-El sitio es estático: Vercel lo publica tal cual desde este repositorio, sin paso de compilación.
-Cada `git push` a `main` actualiza el sitio.
+El sitio está publicado en https://red-itspe-3d.vercel.app (proyecto `red-itspe-3d` en Vercel).
+Es estático: Vercel lo publica tal cual desde este repositorio, sin paso de compilación,
+y cada `git push` a `main` actualiza el sitio.
 
 ## Supuestos
 
