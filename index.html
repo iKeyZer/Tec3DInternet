@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Red ITSPe 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+<div id="app" class="app">
+  <div id="visor" class="visor" aria-label="Plano 3D del campus. Arrastra para girar, rueda para acercar."></div>
+  <div id="marcadores" class="marcadores"></div>
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+
+  <header class="titulo">
+    <div class="titulo__marca">
+      <span class="eyebrow">Plano de red · Perote, Veracruz</span>
+      <h1>Red ITSPe 3D</h1>
+      <p>Cobertura Wi-Fi y videovigilancia del Instituto Tecnológico Superior de Perote</p>
+    </div>
+    <dl class="cifras">
+      <div class="cifra cifra--ap"><dt>Access points</dt><dd id="n-ap">0</dd></div>
+      <div class="cifra cifra--cam"><dt>Cámaras</dt><dd id="n-cam">0</dd></div>
+      <div class="cifra cifra--infra"><dt>Nodos</dt><dd id="n-infra">0</dd></div>
+      <div class="cifra" title="Porcentaje del campus con señal estimada de al menos −67 dBm"><dt>Cobertura</dt><dd id="n-cob">…</dd></div>
+    </dl>
+  </header>
+
+  <nav class="herramientas" aria-label="Vistas y capas">
+    <div class="grupo" role="group" aria-label="Vista">
+      <button type="button" id="v-iso" class="boton">Isométrica</button>
+      <button type="button" id="v-aerea" class="boton">Aérea</button>
+      <button type="button" id="v-recorrido" class="boton" aria-pressed="false">Recorrido</button>
+    </div>
+    <div class="grupo grupo--capas" role="group" aria-label="Capas">
+      <button type="button" class="capa" data-capa="satelite" aria-pressed="true">Satélite</button>
+      <button type="button" class="capa" data-capa="cobertura" aria-pressed="false">Cobertura Wi-Fi</button>
+      <button type="button" class="capa" data-capa="vision" aria-pressed="true">Campos de visión</button>
+      <button type="button" class="capa" data-capa="red" aria-pressed="true">Red troncal</button>
+      <button type="button" class="capa" data-capa="etiquetas" aria-pressed="true">Etiquetas</button>
+      <button type="button" class="capa" data-capa="rayosx" aria-pressed="false">Rayos X</button>
+    </div>
+    <button type="button" id="abrir-investigacion" class="boton boton--primario">Investigación y equipos</button>
+  </nav>
+
+  <aside class="lista" id="lista" aria-label="Puntos del plano">
+    <div class="lista__cabeza">
+      <div class="filtros" role="group" aria-label="Filtrar por tipo">
+        <button type="button" class="filtro" data-filtro="todos" aria-pressed="true">Todos</button>
+        <button type="button" class="filtro filtro--ap" data-filtro="ap" aria-pressed="false">Wi-Fi</button>
+        <button type="button" class="filtro filtro--cam" data-filtro="cam" aria-pressed="false">Cámaras</button>
+        <button type="button" class="filtro filtro--infra" data-filtro="infra" aria-pressed="false">Red</button>
+      </div>
+      <label class="buscar" for="buscar">
+        <span class="sr">Buscar punto</span>
+        <input type="search" id="buscar" placeholder="Buscar: AP-07, cancha, domo…" autocomplete="off">
+      </label>
+    </div>
+    <div class="lista__cuerpo" id="lista-cuerpo"></div>
+  </aside>
+  <button type="button" id="toggle-lista" class="boton toggle-lista" aria-controls="lista" aria-expanded="false">Puntos del plano</button>
+
+  <aside class="detalle" id="detalle" aria-live="polite" hidden></aside>
+
+  <footer class="cajetin" aria-label="Orientación y escala">
+    <div class="brujula" title="Norte">
+      <svg id="brujula" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="18.5" class="brujula__aro"/>
+        <path d="M20 5 L25 21 L20 18 L15 21 Z" class="brujula__norte"/>
+        <path d="M20 35 L15 19 L20 22 L25 19 Z" class="brujula__sur"/>
+        <text x="20" y="4.2" text-anchor="middle" class="brujula__n">N</text>
+      </svg>
+    </div>
+    <div class="cajetin__datos">
+      <div class="escala">
+        <span class="escala__barra" id="escala-barra"></span>
+        <span class="escala__texto" id="escala-texto">50 m</span>
+      </div>
+      <dl class="coordenadas">
+        <div><dt>Ref.</dt><dd>19.54616° N · 97.26972° O</dd></div>
+        <div><dt>Cursor</dt><dd id="cursor-geo">—</dd></div>
+      </dl>
+    </div>
+    <ul class="simbologia" aria-label="Simbología">
+      <li><span class="sim sim--ap"></span>Access point</li>
+      <li><span class="sim sim--cam"></span>Cámara</li>
+      <li><span class="sim sim--infra"></span>Nodo de red</li>
+      <li><span class="sim-linea sim-linea--fibra"></span>Fibra</li>
+      <li><span class="sim-linea sim-linea--inal"></span>Inalámbrico</li>
+    </ul>
+    <small class="atribucion">Imagen satelital: Google Maps · © Airbus, CNES / Airbus, Maxar Technologies</small>
+  </footer>
+
+  <div class="leyenda-cobertura" id="leyenda-cobertura" hidden>
+    <span class="leyenda-cobertura__titulo" id="leyenda-cobertura-titulo">Señal estimada en 5 GHz</span>
+    <ol>
+      <li><span style="--c: var(--rssi-1)"></span>≥ −55 dBm excelente</li>
+      <li><span style="--c: var(--rssi-2)"></span>−55 a −67 buena</li>
+      <li><span style="--c: var(--rssi-3)"></span>−67 a −72 aceptable</li>
+      <li><span style="--c: var(--rssi-4)"></span>−72 a −78 débil</li>
+    </ol>
+    <small>Modelo predictivo simplificado. Se valida con un site survey en sitio.</small>
+  </div>
+
+  <div class="vista-camara" id="vista-camara" hidden>
+    <div class="vista-camara__marco"></div>
+    <div class="vista-camara__sup">
+      <span class="rec">REC</span>
+      <span id="vc-id">CAM-00</span>
+      <span id="vc-reloj" class="vista-camara__reloj"></span>
+    </div>
+    <div class="vista-camara__inf">
+      <span id="vc-info"></span>
+      <button type="button" id="vc-salir" class="boton boton--primario">Salir de la vista de cámara</button>
+    </div>
+  </div>
+
+  <div class="cargando" id="cargando" role="status">
+    <span class="cargando__punto"></span>
+    <span id="cargando-texto">Cargando plano 3D…</span>
+  </div>
+</div>
+
+<dialog id="investigacion" class="investigacion" aria-labelledby="inv-titulo">
+  <div class="investigacion__barra">
+    <div>
+      <span class="eyebrow">Memoria técnica</span>
+      <h2 id="inv-titulo">Cómo se cubre un campus con Wi-Fi y cámaras</h2>
+    </div>
+    <button type="button" class="boton" id="cerrar-investigacion">Cerrar</button>
+  </div>
+
+  <div class="investigacion__cuerpo">
+    <section>
+      <h3>Lo que hacen los campus que tienen buen Wi-Fi</h3>
+      <div class="practicas">
+        <article>
+          <h4>Diseñar por capacidad, no solo por cobertura</h4>
+          <p>Un aula tiene de 30 a 40 alumnos con uno o dos dispositivos cada uno. Las universidades colocan un access point por aula o por cada dos aulas, y usan equipos de alta densidad en auditorios y gimnasios. Un solo AP potente en el pasillo da “rayitas” pero se satura.</p>
+        </article>
+        <article>
+          <h4>−67 dBm como meta de señal</h4>
+          <p>Los estándares de diseño universitarios piden al menos −67 dBm en toda zona de uso y alrededor de −50 dBm como nivel excelente. Las celdas se traslapan entre 15 y 20 % para que el celular pase de un AP a otro sin cortar una videollamada.</p>
+        </article>
+        <article>
+          <h4>5 y 6 GHz para usuarios, 2.4 GHz para sensores</h4>
+          <p>Las bandas de 5 y 6 GHz tienen más canales y menos interferencia. La de 2.4 GHz se reserva para dispositivos IoT, como los sensores de los invernaderos. En zonas densas se usan canales angostos (20 MHz) y potencia moderada.</p>
+        </article>
+        <article>
+          <h4>Exterior con equipos sellados y distancias cortas</h4>
+          <p>Los AP exteriores van en postes o fachadas, con grado IP67, protector contra descargas y tierra física. La señal cae con la distancia y dentro de los autos, así que se busca línea de vista y celdas pequeñas en vez de un solo equipo lejano.</p>
+        </article>
+        <article>
+          <h4>Fibra entre edificios, cobre dentro</h4>
+          <p>El cable UTP Cat6/6A llega hasta 100 m y alimenta los equipos por PoE+. Entre edificios se usa fibra óptica, que no tiene ese límite y no conduce descargas eléctricas. Donde no hay ducto, un puente inalámbrico punto a punto evita abrir zanjas.</p>
+        </article>
+        <article>
+          <h4>Predecir, medir y monitorear</h4>
+          <p>El proceso es: diseño predictivo sobre planos (como el mapa de calor de esta app), site survey en sitio para medir señal y velocidad reales, y monitoreo continuo desde el controlador para ajustar canales y potencias.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h3>Arquitectura propuesta</h3>
+      <ol class="arquitectura">
+        <li>
+          <span class="arquitectura__nivel">Internet</span>
+          <p>Fibra dedicada del proveedor (1 Gb/s sugerido) más una segunda línea de otro proveedor con conmutación automática.</p>
+        </li>
+        <li>
+          <span class="arquitectura__nivel">Núcleo · MDF Edificio A</span>
+          <p>UDM-Pro-Max (firewall, VLAN, portal cautivo y controlador), USW-Aggregation 10G para las fibras y UNVR Pro para grabar el video.</p>
+        </li>
+        <li>
+          <span class="arquitectura__nivel">Distribución · fibra OS2</span>
+          <p>Estrella de fibra desde el centro de cómputo principal (Edificio A, lado norte) hacia los gabinetes del Edificio A lado cancha (IDF-1) y de los Edificios I (IDF-2), D (IDF-3) y B (IDF-4). Dos fibras de respaldo, D–B y A–I, cierran anillos para que un corte no deje sin red a una zona. Puente de 60 GHz hacia invernaderos.</p>
+        </li>
+        <li>
+          <span class="arquitectura__nivel">Acceso · cobre Cat6A + PoE+</span>
+          <p>Switches USW-Pro-Max con PoE+ alimentan cada access point y cámara con un solo cable de máximo 100 m.</p>
+        </li>
+        <li>
+          <span class="arquitectura__nivel">Dispositivos</span>
+          <p><span id="arq-resumen">Access points Wi-Fi 7 y cámaras IP</span>, todos administrados desde una sola consola.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section>
+      <h3>Lista de equipos</h3>
+      <p class="nota">Modelos de referencia del ecosistema UniFi de Ubiquiti, elegido porque una sola consola administra red y cámaras y no cobra licencias anuales. Las cantidades salen del plano.</p>
+      <div class="tabla-envoltura">
+        <table class="tabla" id="tabla-materiales">
+          <thead><tr><th scope="col">Equipo</th><th scope="col">Para qué sirve</th><th scope="col" class="num">Cant.</th><th scope="col">Dónde</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="nota">Además: fibra monomodo OS2 de 12 hilos y transceptores SFP+, cable Cat6A (exterior en ducto), postes galvanizados de 4 a 7 m con tierra física, protectores de sobretensión Ethernet en cada equipo exterior y discos duros de videovigilancia para el NVR.</p>
+      <h4>Alternativas</h4>
+      <ul class="alternativas">
+        <li><strong>TP-Link Omada + cámaras VIGI.</strong> Más económico y con controlador gratuito; buena opción si el presupuesto es corto.</li>
+        <li><strong>Hikvision o Dahua + NVR.</strong> Muy comunes en México para CCTV; se integran a cualquier red, pero se administran aparte del Wi-Fi.</li>
+        <li><strong>Cisco Meraki o HPE Aruba.</strong> Nivel empresarial, con soporte y analítica avanzados; requieren licencias anuales.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>Redes separadas (VLAN y SSID)</h3>
+      <div class="tabla-envoltura">
+        <table class="tabla">
+          <thead><tr><th scope="col">VLAN</th><th scope="col">Red</th><th scope="col">SSID / acceso</th><th scope="col">Seguridad</th></tr></thead>
+          <tbody>
+            <tr><td class="num">10</td><td>Gestión de equipos</td><td>Solo cableado</td><td>Acceso exclusivo de TI</td></tr>
+            <tr><td class="num">20</td><td>Administrativos</td><td>Cableado + ITSPe-Admin</td><td>WPA3-Enterprise (802.1X)</td></tr>
+            <tr><td class="num">30</td><td>Docentes</td><td>ITSPe-Docentes</td><td>WPA3-Enterprise con usuario institucional</td></tr>
+            <tr><td class="num">40</td><td>Alumnos</td><td>ITSPe-Alumnos</td><td>WPA2/WPA3-Enterprise con matrícula; límite de ancho de banda por usuario</td></tr>
+            <tr><td class="num">50</td><td>Visitantes</td><td>ITSPe-Visitantes</td><td>Portal cautivo con código, aislamiento entre clientes</td></tr>
+            <tr><td class="num">60</td><td>Videovigilancia</td><td>Solo cableado</td><td>Sin salida a Internet; solo el NVR ve las cámaras</td></tr>
+            <tr><td class="num">70</td><td>IoT invernaderos</td><td>ITSPe-IoT (2.4 GHz, oculto)</td><td>WPA2-PSK, sin acceso al resto de la red</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h3>Criterios para ubicar cámaras</h3>
+      <p>La norma IEC 62676-4 define cuánto detalle debe dar una cámara según los píxeles por metro (px/m) que ocupa el objetivo. Esa densidad depende de la resolución, del ángulo del lente y de la distancia, por eso cada cámara del plano indica hasta dónde alcanza cada nivel.</p>
+      <div class="tabla-envoltura">
+        <table class="tabla">
+          <thead><tr><th scope="col">Nivel</th><th scope="col" class="num">px/m</th><th scope="col">Qué permite</th><th scope="col">Dónde se usa en el ITSPe</th></tr></thead>
+          <tbody>
+            <tr><td>Detección</td><td class="num">25</td><td>Saber que hay una persona o vehículo</td><td>Perímetro y colindancias</td></tr>
+            <tr><td>Observación</td><td class="num">62</td><td>Ver qué está haciendo</td><td>Estacionamientos, patios, interiores amplios</td></tr>
+            <tr><td>Reconocimiento</td><td class="num">125</td><td>Reconocer a alguien conocido</td><td>Puertas internas, cafetería, patios</td></tr>
+            <tr><td>Identificación</td><td class="num">250</td><td>Identificar a un desconocido</td><td>Accesos, ventanillas, site</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul class="reglas">
+        <li>Accesos con cámara de identificación y lectura de placas: es la evidencia más útil.</li>
+        <li>Las cámaras de perímetro miran a lo largo de la barda, no de frente, y usan detección de cruce de línea.</li>
+        <li>Dos cámaras enfrentadas en estacionamientos eliminan puntos ciegos detrás de los vehículos.</li>
+        <li>Nunca en baños, vestidores, lactarios ni dentro de la enfermería. Avisos de “zona videovigilada” y aviso de privacidad, como pide la Ley General de Protección de Datos Personales en Posesión de Sujetos Obligados.</li>
+        <li>Grabación en una VLAN aislada, con retención de unos 30 días y acceso solo a personal autorizado.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>Calculadoras</h3>
+      <div class="calculadoras">
+        <form class="calc" id="calc-red" aria-labelledby="calc-red-titulo">
+          <h4 id="calc-red-titulo">Internet y número de AP</h4>
+          <label for="c-alumnos">Alumnos <output id="o-alumnos"></output></label>
+          <input type="range" id="c-alumnos" min="300" max="4000" step="1" value="1361">
+          <label for="c-personal">Docentes y personal <output id="o-personal"></output></label>
+          <input type="range" id="c-personal" min="20" max="600" step="5" value="150">
+          <label for="c-disp">Dispositivos por persona <output id="o-disp"></output></label>
+          <input type="range" id="c-disp" min="1" max="3" step="0.1" value="1.8">
+          <label for="c-conc">Conectados al mismo tiempo <output id="o-conc"></output></label>
+          <input type="range" id="c-conc" min="10" max="80" step="1" value="35">
+          <label for="c-mbps">Mb/s por dispositivo activo <output id="o-mbps"></output></label>
+          <input type="range" id="c-mbps" min="0.25" max="3" step="0.05" value="0.75">
+          <label for="c-porap">Clientes activos por AP (diseño) <output id="o-porap"></output></label>
+          <input type="range" id="c-porap" min="20" max="80" step="1" value="40">
+          <dl class="resultado">
+            <div><dt>Dispositivos simultáneos</dt><dd id="r-clientes">—</dd></div>
+            <div><dt>Internet recomendado</dt><dd id="r-internet">—</dd></div>
+            <div><dt>AP mínimos por capacidad</dt><dd id="r-aps">—</dd></div>
+          </dl>
+          <p class="nota">Matrícula de referencia: 1,361 alumnos en 2022 según DataMéxico. El personal es una suposición; ajústalo.</p>
+        </form>
+        <form class="calc" id="calc-nvr" aria-labelledby="calc-nvr-titulo">
+          <h4 id="calc-nvr-titulo">Almacenamiento del grabador</h4>
+          <label for="c-cams">Cámaras <output id="o-cams"></output></label>
+          <input type="range" id="c-cams" min="1" max="64" step="1" value="21">
+          <label for="c-bitrate">Mb/s promedio por cámara (H.265) <output id="o-bitrate"></output></label>
+          <input type="range" id="c-bitrate" min="1" max="12" step="0.5" value="4">
+          <label for="c-dias">Días de retención <output id="o-dias"></output></label>
+          <input type="range" id="c-dias" min="7" max="90" step="1" value="30">
+          <label for="c-mov">Tiempo grabando (continuo = 100 %) <output id="o-mov"></output></label>
+          <input type="range" id="c-mov" min="20" max="100" step="5" value="100">
+          <dl class="resultado">
+            <div><dt>Almacenamiento necesario</dt><dd id="r-tb">—</dd></div>
+            <div><dt>Discos de 8 TB en RAID 5</dt><dd id="r-discos">—</dd></div>
+          </dl>
+          <p class="nota">El UNVR Pro tiene 7 bahías: con 7 discos de 8 TB en RAID 5 quedan unos 48 TB útiles.</p>
+        </form>
+      </div>
+    </section>
+
+    <section>
+      <h3>Supuestos de este plano</h3>
+      <ul class="reglas">
+        <li>Escala de la imagen: 1 px ≈ 0.45 m, medida contra Google Maps (zoom 19). El campus mide unos 380 m de largo.</li>
+        <li>Los usos de los edificios son supuestos a partir de la vista satelital; se pueden editar en <code>js/datos.js</code>.</li>
+        <li>El mapa de calor usa un modelo de pérdida log-distancia en 5 GHz con 10 dB por muro exterior. Sirve para comparar ubicaciones, no reemplaza la medición en sitio.</li>
+        <li>Los ángulos de visión de las cámaras son de diseño; confirma el lente de cada modelo en su ficha técnica.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>Fuentes consultadas</h3>
+      <ul class="fuentes">
+        <li><a href="https://www.unsw.edu.au/content/dam/pdfs/estate-management/contractors/design-documents/2026-09-unsw-it-campus-wi-fi-coverage-design-standards-v3-6-jan-2026.pdf" target="_blank" rel="noopener">UNSW · Campus Wi-Fi coverage design standards</a></li>
+        <li><a href="https://www.accessagility.com/wifi-design-guide" target="_blank" rel="noopener">AccessAgility · WiFi design guide</a></li>
+        <li><a href="https://edtechmagazine.com/higher/article/2015/05/5-tips-deploying-outdoor-lan" target="_blank" rel="noopener">EdTech Magazine · 5 tips for deploying an outdoor LAN</a></li>
+        <li><a href="https://attheu.utah.edu/?p=77482" target="_blank" rel="noopener">University of Utah · Ampliación del Wi-Fi exterior</a></li>
+        <li><a href="https://techspecs.ui.com/unifi/wifi/u7-pro-outdoor-us" target="_blank" rel="noopener">Ubiquiti · Ficha técnica U7 Pro Outdoor</a></li>
+        <li><a href="https://ui.com/camera-security" target="_blank" rel="noopener">Ubiquiti · Línea de cámaras UniFi Protect</a></li>
+        <li><a href="https://www.cdw.com/product/ubiquiti-unifi-building-to-building-bridge-wireless-bridge/5861690" target="_blank" rel="noopener">CDW · UniFi Building-to-Building Bridge (UBB)</a></li>
+        <li><a href="https://whitepapers.axis.com/pixel-density-and-dori" target="_blank" rel="noopener">Axis · Pixel density and DORI</a></li>
+        <li><a href="https://www.cctvdesigntool.com/blog/dori-standard-cctv/" target="_blank" rel="noopener">CCTV Design Tool · Estándar DORI</a></li>
+        <li><a href="https://www.economia.gob.mx/datamexico/es/profile/institution/instituto-tecnologico-superior-de-perote" target="_blank" rel="noopener">DataMéxico · Instituto Tecnológico Superior de Perote</a></li>
+      </ul>
+    </section>
+  </div>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="js/datos.js"></script>
+<script src="js/satelite.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

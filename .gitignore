@@ -1,0 +1,9 @@
+# Configuración local del editor y de herramientas
+.claude/
+.vscode/
+.vercel/
+
+# Archivos del sistema
+Thumbs.db
+desktop.ini
+.DS_Store
