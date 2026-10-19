@@ -433,6 +433,49 @@
     return g;
   }
 
+  // Enlace abierto: escalera en U que sube al puente de la planta alta, con un cuarto
+  // cerrado (el taller) en planta baja bajo el puente. Ejes locales: x cruza el patio
+  // de un ala a la otra; +z apunta al extremo poniente de las alas.
+  function crearEscaleraU(e, L, A, H, grupo, piezas, mats) {
+    const hPiso = H / e.pisos;
+    const mat = (color) => {
+      const m = new T.MeshStandardMaterial({ color: new T.Color(color), roughness: 0.85 });
+      mats.push(m);
+      return m;
+    };
+    const crema = mat('#e9dcc0'), naranja = mat(e.muro || '#c56a3a'), concreto = mat('#c9c4b9'), blanco = mat('#f1ece2');
+    const caja = (w, h, d, m, x, y, z, rotZ) => {
+      const b = new T.Mesh(new T.BoxGeometry(w, h, d), m);
+      b.position.set(x, y, z);
+      if (rotZ) b.rotation.z = rotZ;
+      grupo.add(b);
+      piezas.push(b);
+    };
+    [-1, 1].forEach((sx) => [-1, 1].forEach((sz) => caja(0.45, H, 0.45, blanco, sx * (L / 2 - 0.3), H / 2, sz * (A / 2 - 0.3))));
+    // Taller en planta baja, con pasos libres a los dos lados.
+    const zT0 = -A / 2 + 0.6, zT1 = -0.3;
+    caja(Math.min(5.2, L - 4.4), hPiso - 0.1, zT1 - zT0, naranja, 0, (hPiso - 0.1) / 2, (zT0 + zT1) / 2);
+    // Puente de la planta alta sobre el taller, con su pretil hacia el patio.
+    const zP0 = -A / 2 + 0.3, zP1 = 0;
+    caja(L, 0.25, zP1 - zP0, crema, 0, hPiso, (zP0 + zP1) / 2);
+    caja(L, 1, 0.18, crema, 0, hPiso + 0.6, zP0);
+    // Escalera en U: el tramo 1 sube hacia +x, descanso, el tramo 2 regresa hacia -x.
+    const huella = 0.3, escalones = 10, peralte = hPiso / 2 / escalones, corrida = huella * escalones, x0 = -corrida / 2;
+    const tramo1 = { z: A / 2 - 2.2, ancho: 1.5 }, tramo2 = { z: A / 2 - 3.9, ancho: 1.5 };
+    for (let j = 0; j < escalones; j++) {
+      caja(huella, 0.16, tramo1.ancho, concreto, x0 + huella * (j + 0.5), peralte * (j + 1) - 0.08, tramo1.z);
+      caja(huella, 0.16, tramo2.ancho, concreto, -x0 - huella * (j + 0.5), hPiso / 2 + peralte * (j + 1) - 0.08, tramo2.z);
+    }
+    const largo = Math.hypot(corrida, hPiso / 2), inclinacion = Math.atan2(hPiso / 2, corrida);
+    caja(largo, 0.15, tramo1.ancho, concreto, 0, hPiso / 4 - 0.15, tramo1.z, inclinacion);
+    caja(largo, 0.15, tramo2.ancho, concreto, 0, (3 * hPiso) / 4 - 0.15, tramo2.z, -inclinacion);
+    const zD0 = tramo2.z - tramo2.ancho / 2, zD1 = tramo1.z + tramo1.ancho / 2;
+    caja(1.4, 0.2, zD1 - zD0, concreto, -x0 + 0.7, hPiso / 2 - 0.1, (zD0 + zD1) / 2);
+    // Descanso superior que une el tramo 2 con el puente.
+    const zS1 = tramo2.z + tramo2.ancho / 2;
+    caja(1.4, 0.2, zS1 - zP1, crema, x0 - 0.7, hPiso - 0.1, (zP1 + zS1) / 2);
+  }
+
   const mallasEdificio = [];
   function crearEdificio(e) {
     const L = e.l * S, A = e.a * S, H = e.h;
@@ -466,6 +509,8 @@
         piezas.push(viga);
       });
       grupo.add(crearCancha(L, A));
+    } else if (e.estructura === 'escalera-u') {
+      crearEscaleraU(e, L, A, H, grupo, piezas, mats);
     } else {
       const muros = new T.Mesh(new T.BoxGeometry(L, H, A), [mCorto, mCorto, tapa, tapa, mLargo, mLargo]);
       muros.position.y = H / 2;
@@ -482,6 +527,14 @@
       const tapas = e.abierto ? new T.MeshBasicMaterial({ visible: false }) : mCorto;
       techo = new T.Mesh(geomArco(L, A, e.techo.alto), [matTecho(e.techo.color, 0.8), tapas]);
       techo.position.y = H;
+    } else if (e.estructura === 'escalera-u') {
+      // Losa solo sobre el puente y el taller; la escalera queda a cielo abierto bajo una viga.
+      techo = new T.Mesh(new T.BoxGeometry(L + 0.4, 0.45, A / 2 + 0.2), tapa);
+      techo.position.set(0, H + 0.2, -A / 4);
+      const viga = new T.Mesh(new T.BoxGeometry(L + 0.4, 0.45, 0.35), tapa);
+      viga.position.set(0, H + 0.2, A / 2 - 0.15);
+      grupo.add(viga);
+      piezas.push(viga);
     } else {
       techo = new T.Mesh(new T.BoxGeometry(L + 0.4, 0.45, A + 0.4), tapa);
       techo.position.y = H + 0.2;
@@ -944,8 +997,9 @@
   const mascara = new Uint8Array(GW * GH);
   const perdidaMuro = [0], perdidaInterior = [0];
   edificios.forEach((e) => {
-    perdidaMuro[e._indice] = e.abierto ? 0 : e.translucido ? 3 : 10;
-    perdidaInterior[e._indice] = e.abierto ? 0 : 0.35; // dB por metro de tabiques interiores
+    const libre = e.abierto || e.estructura === 'escalera-u';
+    perdidaMuro[e._indice] = libre ? 0 : e.translucido ? 3 : 10;
+    perdidaInterior[e._indice] = libre ? 0 : 0.35; // dB por metro de tabiques interiores
   });
   for (let gy = 0; gy < GH; gy++) {
     for (let gx = 0; gx < GW; gx++) {
